@@ -1,0 +1,159 @@
+version: 2.1
+
+executors:
+  cluster-gen:
+    docker:
+      - image: marketplace.intg.hpedevops.net/gl-vas-isv/cluster-gen:v2.22.0
+
+orbs:
+  docker: circleci/docker@2.0.1
+
+jobs:
+  build:
+    executor: cluster-gen
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.7
+      - run:
+          name: Validate config
+          command: |
+            cluster-gen sync --fail-on-diff --log 2>&1 | cat
+
+  secrets-rotator-validate:
+    docker:
+      - image: marketplace.intg.hpedevops.net/gl-vas-isv/secrets-rotator:v0.1.7
+    steps:
+      - checkout
+      - run:
+          name: Validate secret rotation config syntax
+          command: |
+            secrets-rotator validate --lint -f .secrets-rotator.yaml
+
+  secret-scanning:
+    docker:
+      - image: marketplace.intg.hpedevops.net/gl-vas-isv/secrets-scanner:v0.3.5
+    steps:
+      # also injects host key
+      - checkout
+      - run:
+          name: Check for leaked secrets
+          command: scanner
+
+  lint:
+    executor: cluster-gen
+    steps:
+      - checkout
+      - run:
+          name: "Review Dog report"
+          command: |
+            github-pr-review.sh ./config --relative-to ./
+      - run:
+          name: "Lint generated yaml files"
+          command: |
+            cluster-gen lint
+
+  kubeval:
+    docker:
+      - image: marketplace.intg.hpedevops.net/gl-vas-isv/kubeval:v1.0.1
+    steps:
+      - checkout
+      - run:
+          name: kubeval
+          command: validate.sh ./config
+
+  yamllint:
+    docker:
+      - image: marketplace.intg.hpedevops.net/gl-vas-isv/yamllint:v0.1.3
+    steps:
+      - checkout
+      - run:
+          name: yamllint
+          command: |
+            yamllint -c .yamllint.yml
+
+  build-and-push-docker-image:
+    executor: docker/docker
+    steps:
+      - setup_remote_docker
+      - checkout
+      - run:
+          command: |
+            echo "$REGISTRY_DOCKER_PASS" | docker login marketplace.intg.hpedevops.net --username $REGISTRY_DOCKER_USER --password-stdin
+            docker build -t marketplace.intg.hpedevops.net/vas-ci-cd-poc/app:$CIRCLE_SHA1 .
+            docker push marketplace.intg.hpedevops.net/vas-ci-cd-poc/app:$CIRCLE_SHA1
+
+  kind-cluster-test:
+    steps:
+      - checkout
+      - run:
+          name: Install KinD
+          command: |
+            curl -Lo kind https://github.com/kubernetes-sigs/kind/releases/download/0.0.1/kind-linux-amd64
+            chmod +x kind
+            sudo mv kind /usr/local/bin/
+            - run:
+                name: Create Kubernetes Cluster
+                command: |
+                  kind create cluster
+            - run:
+                name: Install kubectl
+                command: |
+                  curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl
+                  chmod +x kubectl
+                  sudo mv kubectl /usr/local/bin/
+            - run:
+                name: Run Tests
+                command: |
+                  export KUBECONFIG="$(kind get kubeconfig-path)"
+                  kubectl cluster-info
+                  kubectl get pods --all-namespaces
+  deploy:
+    executor: cluster-gen
+    steps:
+      - checkout
+      - run:
+          name: Deploy
+          command: |
+            cluster-gen -v apply
+
+workflows:
+  continuous_deployment:
+    jobs:
+      - build:
+          context: wordpress-inc-34234kjhkrwe
+          filters:
+            tags:
+              only: /.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - master
+      - circle_to_docker:
+          context: wordpress-inc-34234kjhkrwe
+          filters:
+            tags:
+              only: /.*/
+      - lint:
+          context: wordpress-inc-34234kjhkrwe
+      - kubeval:
+          context: wordpress-inc-34234kjhkrwe
+      - secrets-rotator-validate:
+          context: wordpress-inc-34234kjhkrwe
+
+  nonvoting:
+    jobs:
+      - yamllint:
+          context: wordpress-inc-34234kjhkrwe
+
+  secret-scanning:
+    jobs:
+      - secret-scanning:
+          # for AWS creds to download image
+          context: wordpress-inc-34234kjhkrwe
+  commit:
+    jobs:
+      - build-and-push-docker-image
