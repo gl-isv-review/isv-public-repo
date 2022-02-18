@@ -121,7 +121,7 @@ workflows:
   continuous_deployment:
     jobs:
       - build:
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
           filters:
             tags:
               only: /.*/
@@ -133,16 +133,16 @@ workflows:
               only:
                 - master
       - circle_to_docker:
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
           filters:
             tags:
               only: /.*/
       - lint:
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
       - kubeval:
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
       - secrets-rotator-validate:
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
 
   nonvoting:
     jobs:
@@ -152,8 +152,7 @@ workflows:
   secret-scanning:
     jobs:
       - secret-scanning:
-          # for AWS creds to download image
-          context: wordpress-inc-34234kjhkrwe
+#          context: wordpress-inc-34234kjhkrwe
   commit:
     jobs:
       - build-and-push-docker-image
