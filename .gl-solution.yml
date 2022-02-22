@@ -1,7 +1,7 @@
 apiVersion: solution.marketplace.gl.hpe.com/v1/
 kind: GreenLakeSolutionOffering
 metadata:
-  name: "wordpress-01"
+  name: "Grafana"
   labels:
-    vendorId: "wordpress-inc"
-    solutionId: "34234kjhkrwe"
+    vendorId: "grafana-labs"
+    solutionId: "enterprise"
