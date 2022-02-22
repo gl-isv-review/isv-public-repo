@@ -35,16 +35,16 @@ stages:
     storage:
       spec:
         mountPath: {}
-  - entrypoint:
-    - scorecard-test
-    - olm-crds-have-resources
-    image: quay.io/operator-framework/scorecard-test:v1.12.0
-    labels:
-      suite: olm
-      test: olm-crds-have-resources-test
-    storage:
-      spec:
-        mountPath: {}
+  # - entrypoint:
+  #   - scorecard-test
+  #   - olm-crds-have-resources
+  #   image: quay.io/operator-framework/scorecard-test:v1.12.0
+  #   labels:
+  #     suite: olm
+  #     test: olm-crds-have-resources-test
+  #   storage:
+  #     spec:
+  #       mountPath: {}
   - entrypoint:
     - scorecard-test
     - olm-spec-descriptors
